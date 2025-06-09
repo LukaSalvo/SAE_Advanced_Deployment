@@ -24,6 +24,32 @@ Pour les proffesionnels, un abonnement existe pour 7.99 euro / mois, vous pourre
 -  Pour les professionnels : **abonnement mensuel peu coûteux** permettant de créer un nombre illimité d’événements
 
 
+## Technologies utilisées
+
+**Frontend :**
+- React (Vite)
+- CSS (personnalisé)
+- ESLint (configuré)
+- Docker (conteneurisation du client)
+
+**Backend :**
+- Node.js + Express (API REST)
+- Gestion des utilisateurs, événements et abonnements
+- Docker (conteneurisation du serveur)
+
+**Base de données :**
+- Sans doutes PostGressSQL
+
+**Infrastructure & Déploiement :**
+- Docker Compose (orchestration des services)
+- GitHub Actions (CI/CD – à mettre en place)
+- Cloud (déploiement prévu)
+
+**Documentation :**
+- README.md (instructions)
+- docs/synthetise.md (historique, choix, obstacles)
+- explication.md (présentation générale du projet)
+
 ##  Résultat attendu
 
 Un prototype minimal mais complet, capable de :
@@ -34,4 +60,4 @@ Un prototype minimal mais complet, capable de :
 
 ##  Documentation
 
-Toutes les instructions seront détaillées dans le fichier `README.md` : installation, utilisation, architecture technique, et contribution.
+Toutes les instructions seront détaillées dans le fichier `README.md` : installation, utilisation, architecture technique.
