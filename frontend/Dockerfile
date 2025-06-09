@@ -3,6 +3,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+# Create cache directories and set permissions
+RUN mkdir -p /tmp/vite-cache /app/node_modules/.vite-temp && \
+    chown -R node:node /app /tmp/vite-cache /app/node_modules/.vite-temp && \
+    chmod -R u+rw /app /tmp/vite-cache /app/node_modules/.vite-temp
 RUN npm run build
 USER node
 EXPOSE 3000
