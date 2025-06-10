@@ -1,5 +1,6 @@
+
 .app-container {
-  min-height: 100vh;
+  min-height: 100vh; 
   padding: 20px;
   font-family: 'Segoe UI', 'Arial', sans-serif;
   color: #2c3e50;
@@ -8,6 +9,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  flex: 1; 
 }
 
 h1 {
@@ -120,6 +122,10 @@ h1 {
 .events-section {
   width: 100%;
   max-width: 900px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; 
 }
 
 .events-section h2 {
@@ -159,6 +165,8 @@ h1 {
   padding: 0;
   display: grid;
   gap: 15px;
+  overflow-y: auto; 
+  flex-grow: 1; 
 }
 
 .event-item {
@@ -274,7 +282,8 @@ h1 {
   align-items: center;
 }
 
-.modal.auth-modal, .modal.event-modal {
+.modal.auth-modal,
+.modal.event-modal {
   background-color: white;
   padding: 25px;
   border-radius: 10px;
@@ -353,7 +362,7 @@ h1 {
   color: #7f8c8d;
 }
 
-/* Responsive design */
+
 @media (max-width: 600px) {
   .app-container {
     padding: 10px;
