@@ -131,13 +131,18 @@ app.put('/events/:id', authenticateToken, async (req, res) => {
 // Route pour supprimer un événement
 app.delete('/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
+  console.log('Tentative de suppression - id:', id, 'user_id:', req.user.id); // Ajout de débogage
   try {
     const result = await pool.query('DELETE FROM events WHERE id = $1 AND user_id = $2 RETURNING *', [id, req.user.id]);
-    if (result.rows.length === 0) return res.status(403).json({ error: 'Non autorisé' });
-    res.json({ message: 'Événement supprimé' });
+    if (result.rows.length === 0) {
+      console.log('Aucun événement supprimé - Vérification des autorisations');
+      return res.status(403).json({ error: 'Non autorisé ou événement non trouvé' });
+    }
+    console.log('Événement supprimé avec succès:', result.rows[0]);
+    res.json({ message: 'Événement supprimé avec succès' });
   } catch (err) {
-    console.error('Erreur lors de la suppression:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Erreur lors de la suppression - Détails:', err.stack); // Plus de détails
+    res.status(500).json({ error: 'Erreur serveur: ' + err.message });
   }
 });
 
