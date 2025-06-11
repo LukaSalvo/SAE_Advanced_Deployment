@@ -40,6 +40,56 @@ const formatDateForDB = (dateStr) => {
   return date.toISOString().split('T')[0]; 
 };
 
+// Route pour les événements avec nombre de participants
+app.get('/events', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT e.*, COUNT(ue.user_id) as participant_count 
+      FROM events e 
+      LEFT JOIN user_events ue ON e.id = ue.event_id 
+      GROUP BY e.id
+    `);
+    const events = result.rows.map(event => ({
+      ...event,
+      date: formatDateForDB(event.date) || event.date 
+    }));
+    res.json(events);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des événements:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour les événements auxquels l'utilisateur assiste
+app.get('/attending-events', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT e.* FROM events e JOIN user_events ue ON e.id = ue.event_id WHERE ue.user_id = $1',
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des événements auxquels vous assistez:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour se désinscrire d'un événement
+app.delete('/events/:id/unattend', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'DELETE FROM user_events WHERE user_id = $1 AND event_id = $2 RETURNING *',
+      [req.user.id, id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Inscription non trouvée' });
+    res.json({ message: 'Désinscription réussie' });
+  } catch (err) {
+    console.error('Erreur lors de la désinscription:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // Route pour les événements
 app.get('/events', async (req, res) => {
   try {

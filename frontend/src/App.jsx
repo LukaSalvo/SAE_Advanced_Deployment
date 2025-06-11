@@ -60,7 +60,10 @@ function App() {
   const fetchAttendingEvents = async () => {
     try {
       const res = await axios.get('http://localhost:3001/attending-events');
-      setAttendingEvents(res.data);
+      setAttendingEvents(res.data.map(event => ({
+        ...event,
+        date: event.date || '1970-01-01'
+      })));
       setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des événements auxquels vous assistez : ' + err.message);
@@ -85,7 +88,7 @@ function App() {
         const userEvents = events.filter(event => event.user_id === user.id);
         if (userEvents.length >= 3 && !user.isProfessional) {
           setError('Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.');
-          return; // Bloque la création après 3 événements
+          return;
         }
         await axios.post('http://localhost:3001/events', form);
       }
@@ -137,8 +140,19 @@ function App() {
     }
   };
 
+  const handleUnattend = async (id) => {
+    if (!isAuthenticated) return alert('Vous devez être connecté pour vous désinscrire');
+    try {
+      await axios.delete(`http://localhost:3001/events/${id}/unattend`);
+      fetchAttendingEvents();
+      setError(null);
+    } catch (err) {
+      setError('Erreur lors de la désinscription : ' + err.message);
+    }
+  };
+
   const formatDateTime = (dateString, timeString) => {
-    if (!dateString) return 'Date invalide';
+    if (!dateString || dateString === '1970-01-01') return 'Date non disponible';
     const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
     if (isNaN(date.getTime())) {
       return 'Date invalide';
@@ -299,33 +313,43 @@ function App() {
             filteredEvents.map((event) => (
               <li key={event.id} className="event-item">
                 <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                  {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category})
+                  {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category}) 
+                  <span className="participant-count"> - {event.participant_count || 0} participant(s)</span>
                 </span>
-                <div className="event-actions">
-                  <button
-                    onClick={() => handleEdit(event)}
-                    className="edit-btn"
-                    disabled={!isAuthenticated || (user && event.user_id !== user.id)}
-                  >
-                    Modifier
-                  </button>
-                  <button
-                    onClick={() => handleDelete(event.id)}
-                    className="delete-btn"
-                    disabled={!isAuthenticated || (user && event.user_id !== user.id)}
-                  >
-                    Supprimer
-                  </button>
-                  {!attendingEvents.find((e) => e.id === event.id) && (
+                {isAuthenticated && (
+                  <div className="event-actions">
                     <button
-                      onClick={() => handleAttend(event.id)}
-                      className="attend-btn"
-                      disabled={!isAuthenticated || (user && event.user_id === user.id)}
+                      onClick={() => handleEdit(event)}
+                      className="edit-btn"
+                      disabled={user && event.user_id !== user.id}
                     >
-                      Assister
+                      Modifier
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => handleDelete(event.id)}
+                      className="delete-btn"
+                      disabled={user && event.user_id !== user.id}
+                    >
+                      Supprimer
+                    </button>
+                    {!attendingEvents.find((e) => e.id === event.id) ? (
+                      <button
+                        onClick={() => handleAttend(event.id)}
+                        className="attend-btn"
+                        disabled={user && event.user_id === user.id}
+                      >
+                        Assister
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleUnattend(event.id)}
+                        className="unattend-btn"
+                      >
+                        Se désinscrire
+                      </button>
+                    )}
+                  </div>
+                )}
               </li>
             ))
           ) : (
@@ -340,23 +364,32 @@ function App() {
                 <li key={event.id} className="event-item">
                   <span className="event-details" onClick={() => setSelectedEvent(event)}>
                     {event.title} - {formatDateTime(event.date, event.time)} - {event.location}
+                    <span className="participant-count"> - {events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</span>
                   </span>
-                  <div className="event-actions">
-                    <button
-                      onClick={() => handleEdit(event)}
-                      className="edit-btn"
-                      disabled={!isAuthenticated || (user && event.user_id !== user.id)}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => handleDelete(event.id)}
-                      className="delete-btn"
-                      disabled={!isAuthenticated || (user && event.user_id !== user.id)}
-                    >
-                      Supprimer
-                    </button>
-                  </div>
+                  {isAuthenticated && (
+                    <div className="event-actions">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="edit-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="delete-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Supprimer
+                      </button>
+                      <button
+                        onClick={() => handleUnattend(event.id)}
+                        className="unattend-btn"
+                      >
+                        Se désinscrire
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -427,6 +460,7 @@ function App() {
             <p><strong>Date :</strong> {formatDateTime(selectedEvent.date, selectedEvent.time)}</p>
             <p><strong>Lieu :</strong> {selectedEvent.location}</p>
             <p><strong>Catégorie :</strong> {selectedEvent.category}</p>
+            <p><strong>Participants :</strong> {selectedEvent.participant_count || 0}</p>
             <p><strong>Description :</strong> {selectedEvent.description}</p>
             <button onClick={() => setSelectedEvent(null)} className="close-btn">Fermer</button>
           </div>
