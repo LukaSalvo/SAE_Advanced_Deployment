@@ -40,12 +40,10 @@ function App() {
       setUser(res.data);
       setIsAuthenticated(true);
       setError(null);
-      console.log('User fetched:', res.data);
     } catch (err) {
       setIsAuthenticated(false);
       localStorage.removeItem('token');
       setError('Erreur de profil utilisateur : ' + (err.response?.data?.error || err.message));
-      console.error('Fetch user error:', err);
     }
   };
 
@@ -56,7 +54,6 @@ function App() {
       setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des événements : ' + (err.response?.data?.error || err.message));
-      console.error('Fetch events error:', err);
     }
   };
 
@@ -85,11 +82,10 @@ function App() {
         await axios.put(`http://localhost:3001/events/${editingId}`, form);
         setEditingId(null);
       } else {
-        // Vérifier le nombre d'événements créés
         const userEvents = events.filter(event => event.user_id === user.id);
         if (userEvents.length >= 3 && !user.isProfessional) {
           setError('Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.');
-          return;
+          return; // Bloque la création après 3 événements
         }
         await axios.post('http://localhost:3001/events', form);
       }
@@ -127,6 +123,11 @@ function App() {
 
   const handleAttend = async (id) => {
     if (!isAuthenticated) return alert('Vous devez être connecté pour assister à un événement');
+    const event = events.find(e => e.id === id);
+    if (event && event.user_id === user.id) {
+      setError('Vous ne pouvez pas assister à un événement que vous avez créé.');
+      return;
+    }
     try {
       await axios.post(`http://localhost:3001/events/${id}/attend`);
       fetchAttendingEvents();
@@ -137,6 +138,7 @@ function App() {
   };
 
   const formatDateTime = (dateString, timeString) => {
+    if (!dateString) return 'Date invalide';
     const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
     if (isNaN(date.getTime())) {
       return 'Date invalide';
@@ -160,10 +162,8 @@ function App() {
       axios.defaults.headers.Authorization = `Bearer ${newToken}`;
       setShowLogin(false);
       await fetchUser();
-      console.log('Login successful, token:', newToken);
     } catch (err) {
       setError('Échec de la connexion : ' + (err.response?.data?.error || err.message));
-      console.error('Login error:', err);
     }
   };
 
@@ -320,7 +320,7 @@ function App() {
                     <button
                       onClick={() => handleAttend(event.id)}
                       className="attend-btn"
-                      disabled={!isAuthenticated}
+                      disabled={!isAuthenticated || (user && event.user_id === user.id)}
                     >
                       Assister
                     </button>
@@ -363,7 +363,7 @@ function App() {
           </div>
         )}
       </div>
-      {isAuthenticated ? (
+      {isAuthenticated && !(!user.isProfessional && events.filter(event => event.user_id === user.id).length >= 3) ? (
         <form onSubmit={handleSubmit} className="event-form">
           <input
             type="text"
@@ -404,6 +404,11 @@ function App() {
           />
           <button type="submit">{editingId ? 'Modifier' : 'Créer'}</button>
         </form>
+      ) : isAuthenticated ? (
+        <div className="login-prompt">
+          <p>Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.</p>
+          <button onClick={() => setShowRegister(true)} className="auth-btn">S'abonner</button>
+        </div>
       ) : (
         <div className="login-prompt">
           <p>Connectez-vous pour ajouter ou modifier des événements.</p>
