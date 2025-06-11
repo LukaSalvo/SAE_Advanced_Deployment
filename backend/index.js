@@ -5,7 +5,7 @@ const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:3000' })); // Autoriser localhost:3000 pour tests locaux
+app.use(cors({ origin: 'http://localhost:3000' })); 
 
 const pool = new Pool({
   user: process.env.DB_USER,
@@ -17,7 +17,7 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
-// Middleware pour vérifier le token
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -29,6 +29,34 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+
+const isValidDate = (dateStr) => {
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime()) && dateStr.match(/^\d{4}-\d{2}-\d{2}$/); 
+};
+
+const formatDateForDB = (dateStr) => {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString().split('T')[0]; 
+};
+
+// Route pour les événements
+app.get('/events', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM events');
+    
+    const events = result.rows.map(event => ({
+      ...event,
+      date: formatDateForDB(event.date) || event.date 
+    }));
+    res.json(events);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des événements:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
 
 // Route pour le profil utilisateur
 app.get('/profile', authenticateToken, async (req, res) => {
@@ -99,10 +127,14 @@ app.get('/attending-events', authenticateToken, async (req, res) => {
 // Route pour ajouter un événement
 app.post('/events', authenticateToken, async (req, res) => {
   const { title, date, time, location, description } = req.body;
+  const formattedDate = formatDateForDB(date);
+  if (!formattedDate) {
+    return res.status(400).json({ error: 'Date invalide. Utilisez le format YYYY-MM-DD.' });
+  }
   try {
     const result = await pool.query(
       'INSERT INTO events (user_id, title, date, time, location, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, title, date, time, location, description]
+      [req.user.id, title, formattedDate, time, location, description]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -115,10 +147,14 @@ app.post('/events', authenticateToken, async (req, res) => {
 app.put('/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { title, date, time, location, description } = req.body;
+  const formattedDate = formatDateForDB(date);
+  if (!formattedDate) {
+    return res.status(400).json({ error: 'Date invalide. Utilisez le format YYYY-MM-DD.' });
+  }
   try {
     const result = await pool.query(
       'UPDATE events SET title = $1, date = $2, time = $3, location = $4, description = $5 WHERE id = $6 AND user_id = $7 RETURNING *',
-      [title, date, time, location, description, id, req.user.id]
+      [title, formattedDate, time, location, description, id, req.user.id]
     );
     if (result.rows.length === 0) return res.status(403).json({ error: 'Non autorisé ou événement non trouvé' });
     res.json(result.rows[0]);
@@ -131,7 +167,7 @@ app.put('/events/:id', authenticateToken, async (req, res) => {
 // Route pour supprimer un événement
 app.delete('/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  console.log('Tentative de suppression - id:', id, 'user_id:', req.user.id); // Ajout de débogage
+  console.log('Tentative de suppression - id:', id, 'user_id:', req.user.id);
   try {
     const result = await pool.query('DELETE FROM events WHERE id = $1 AND user_id = $2 RETURNING *', [id, req.user.id]);
     if (result.rows.length === 0) {
@@ -141,7 +177,7 @@ app.delete('/events/:id', authenticateToken, async (req, res) => {
     console.log('Événement supprimé avec succès:', result.rows[0]);
     res.json({ message: 'Événement supprimé avec succès' });
   } catch (err) {
-    console.error('Erreur lors de la suppression - Détails:', err.stack); // Plus de détails
+    console.error('Erreur lors de la suppression - Détails:', err.stack);
     res.status(500).json({ error: 'Erreur serveur: ' + err.message });
   }
 });

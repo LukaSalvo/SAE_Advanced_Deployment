@@ -12,7 +12,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState('all');
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token')); // Initialisation basée sur le token
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -28,7 +28,7 @@ function App() {
       fetchUser();
       fetchAttendingEvents();
     } else {
-      setIsAuthenticated(false); // Réinitialiser si pas de token
+      setIsAuthenticated(false);
     }
   }, [token]);
 
@@ -73,6 +73,14 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) return alert('Vous devez être connecté pour créer ou modifier un événement');
+    
+    // Validation de la date
+    const date = new Date(form.date);
+    if (isNaN(date.getTime())) {
+      setError('Date invalide. Utilisez le format YYYY-MM-DD.');
+      return;
+    }
+
     try {
       if (editingId) {
         await axios.put(`http://localhost:3001/events/${editingId}`, form);
@@ -122,16 +130,19 @@ function App() {
     }
   };
 
-  const formatDateTime = (dateString, timeString) => {
-    const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
-    return date.toLocaleString('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+ const formatDateTime = (dateString, timeString) => {
+  const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
+  if (isNaN(date.getTime())) {
+    return 'Date invalide'; 
+  }
+  return date.toLocaleString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -142,7 +153,7 @@ function App() {
       setToken(newToken);
       axios.defaults.headers.Authorization = `Bearer ${newToken}`;
       setShowLogin(false);
-      await fetchUser(); // Assure la mise à jour de l'utilisateur
+      await fetchUser();
       console.log('Login successful, token:', newToken);
     } catch (err) {
       setError('Échec de la connexion : ' + (err.response?.data?.error || err.message));
