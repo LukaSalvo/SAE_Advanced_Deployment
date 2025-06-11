@@ -37,19 +37,22 @@ body.dark-mode .error-message {
 
 .app-container {
   min-height: 100vh;
-  padding: 0;
+  padding: 0 10px; /* Ajoute une marge de 10px de chaque côté */
   font-family: 'Segoe UI', 'Arial', sans-serif;
   color: var(--text-light);
-  background: var(--background-light);
+  background: #ffffff; /* Fond uni blanc */
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch; /* Étire les éléments à la largeur maximale */
   justify-content: flex-start;
   transition: background-color 0.3s ease, color 0.3s ease;
+  width: 100%; /* Assure que le conteneur prend toute la largeur */
+  margin: 0; /* Supprime les marges par défaut */
+  box-sizing: border-box; /* Inclut le padding dans la largeur totale */
 }
 
 .app-header {
-  width: 100%;
+  width: 100%; /* Prend toute la largeur */
   background: var(--primary-color);
   color: var(--text-dark);
   padding: 15px 20px;
@@ -60,14 +63,28 @@ body.dark-mode .error-message {
   position: sticky;
   top: 0;
   z-index: 1000;
+  margin: 0; /* Supprime les marges */
 }
+
+.app-main {
+  width: 100%; /* Étend le main à la pleine largeur */
+  max-width: none; 
+  padding: 20px 0; 
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  box-sizing: border-box; /* Inclut le padding dans la largeur totale */
+}
+
+
 
 .app-header h1 {
   margin: 0;
   font-size: 1.8em;
   text-transform: uppercase;
   letter-spacing: 1px;
-  padding-left: 20px; /* Espacement à gauche */
+  padding-left: 20px;
 }
 
 .nav-buttons {
@@ -146,15 +163,7 @@ body.dark-mode .error-message {
   align-items: center;
 }
 
-.app-main {
-  width: 100%;
-  max-width: 1200px;
-  padding: 20px;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 30px;
-}
+
 
 .event-form {
   display: grid;
@@ -245,62 +254,92 @@ body.dark-mode .error-message {
   outline: none;
 }
 
+
 .events-list {
   list-style: none;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-width), 1fr));
-  gap: 25px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 40px; /* Espacement entre les cartes reste à 40px */
   justify-content: center;
-  max-width: 1200px;
+  max-width: 1300px;
   margin: 0 auto;
+  padding: 20px;
+  background: #ffffff; /* Fond uni blanc */
 }
 
 .event-item {
-  width: var(--card-width);
-  height: var(--card-height);
+  width: 100%;
+  height: 350px;
   display: flex;
   flex-direction: column;
   padding: 15px;
-  background-color: var(--card-bg-light);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(135deg, #ffffff 70%, #f0f4f8); /* Dégradé conservé sur les cartes individuelles */
+  border-radius: 15px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  overflow-y: auto;
+  overflow: hidden;
+  position: relative;
 }
 
+
 .event-item:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  transform: translateY(-10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2), 0 6px 15px rgba(0, 0, 0, 0.15);
 }
 
 .event-details {
   flex-grow: 1;
-  font-size: 1em;
-  color: var(--text-light);
+  font-size: 1.1em;
+  color: #2c3e50;
   margin-bottom: 10px;
   overflow-wrap: break-word;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.event-details p {
+  margin: 5px 0; /* Espacement entre les paragraphes */
+}
+
+.event-details p:first-child {
+  font-weight: bold; /* Titre en gras */
+  margin-top: 0;
+}
+
+.event-details p:last-child {
+  margin-bottom: 0;
 }
 
 .participant-count {
   margin-left: 5px;
   color: #7f8c8d;
+  font-weight: bold;
 }
 
 .event-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: flex-end;
   margin-top: auto;
+  padding: 10px;
+  background: #ffffff;
+  border-top: 1px solid #ecf0f1;
+  border-radius: 0 0 15px 15px;
 }
 
 .edit-btn, .delete-btn, .attend-btn, .unattend-btn {
-  padding: 8px 12px;
+  padding: 10px 15px;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 0.8em;
+  font-size: 0.9em;
   transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .edit-btn {
@@ -351,8 +390,9 @@ body.dark-mode .error-message {
 
 .no-events {
   text-align: center;
-  color: inherit;
+  color: #7f8c8d;
   padding: 20px;
+  font-size: 1.2em;
 }
 
 .attending-section {
@@ -476,6 +516,33 @@ body.dark-mode .modal.event-modal {
   transform: scale(1.05);
 }
 
+.participants-modal .modal-content {
+  max-width: 400px;
+  padding: 20px;
+  text-align: center;
+  background-color: var(--card-bg-light);
+}
+
+body.dark-mode .participants-modal .modal-content {
+  background-color: var(--card-bg-dark);
+}
+
+.view-participants-btn {
+  margin-top: 10px;
+  padding: 5px 10px;
+  background-color: #9b59b6;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.view-participants-btn:hover {
+  background-color: #8e44ad;
+  transform: scale(1.05);
+}
+
 @media (max-width: 600px) {
   .app-container {
     padding: 10px;
@@ -520,5 +587,14 @@ body.dark-mode .modal.event-modal {
 
   .modal {
     width: 95%;
+  }
+
+  .participants-modal .modal-content {
+    width: 90%;
+  }
+
+  .view-participants-btn {
+    width: 100%;
+    padding: 10px;
   }
 }

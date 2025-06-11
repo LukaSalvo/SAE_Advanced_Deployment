@@ -6,7 +6,7 @@
   color-scheme: light dark;
   --primary-color: #1e272e;
   --secondary-color: #2ecc71;
-  --accent-color: #3498db;
+  --accent-color: #f5f6fa;
   --error-color: #e74c3c;
   --background-light: #f5f6fa;
   --background-dark: #0d1b2a;
@@ -32,7 +32,7 @@ a {
   text-decoration: inherit;
 }
 a:hover {
-  color: #2980b9;
+  color: #e0e0e0;
 }
 
 body {
@@ -40,12 +40,18 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: #ffffff; /* Fond uni blanc */
+  width: 100%; /* Assure que le body prend toute la largeur */
+  overflow-x: hidden; /* Empêche le défilement horizontal */
+  padding: 0 10px; /* Ajoute une petite marge latérale */
+  box-sizing: border-box; /* Inclut le padding dans la largeur totale */
 }
 
 #root {
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 h1 {
@@ -92,7 +98,7 @@ button:focus-visible {
     background-color: var(--background-light);
   }
   a:hover {
-    color: #2980b9;
+    color: #e0e0e0;
   }
   button {
     background-color: #f9f9f9;

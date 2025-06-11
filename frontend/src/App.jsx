@@ -12,6 +12,8 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [filter, setFilter] = useState({ type: 'all', category: 'all' });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [participants, setParticipants] = useState([]);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
@@ -76,6 +78,19 @@ function App() {
       setError(null);
     } catch (err) {
       setError('Erreur lors du chargement des événements auxquels vous assistez : ' + err.message);
+    }
+  };
+
+  const fetchParticipants = async (eventId) => {
+    try {
+      const res = await axios.get(`http://localhost:3001/events/${eventId}/participants`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setParticipants(res.data);
+      setShowParticipants(true);
+      setError(null);
+    } catch (err) {
+      setError('Erreur lors de la récupération des participants : ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -249,10 +264,17 @@ function App() {
             <ul className="events-list">
               {attendingEvents.map((event) => (
                 <li key={event.id} className="event-item">
-                  <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                    {event.title} - {formatDateTime(event.date, event.time)} - {event.location}
-                    <span className="participant-count"> - {events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</span>
-                  </span>
+                  <div className="event-details" onClick={() => {
+                    if (isAuthenticated && user && event.user_id === user.id) {
+                      fetchParticipants(event.id);
+                    } else {
+                      setSelectedEvent(event);
+                    }
+                  }}>
+                    <p><strong>{event.title}</strong></p>
+                    <p>{formatDateTime(event.date, event.time)} - {event.location}</p>
+                    <p className="participant-count">{events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</p>
+                  </div>
                   {isAuthenticated && (
                     <div className="event-actions">
                       <button
@@ -304,10 +326,17 @@ function App() {
             {filteredEvents.length > 0 ? (
               filteredEvents.map((event) => (
                 <li key={event.id} className="event-item">
-                  <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                    {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category})
-                    <span className="participant-count"> - {event.participant_count || 0} participant(s)</span>
-                  </span>
+                  <div className="event-details" onClick={() => {
+                    if (isAuthenticated && user && event.user_id === user.id) {
+                      fetchParticipants(event.id);
+                    } else {
+                      setSelectedEvent(event);
+                    }
+                  }}>
+                    <p><strong>{event.title}</strong></p>
+                    <p>{formatDateTime(event.date, event.time)} - {event.location} ({event.category})</p>
+                    <p className="participant-count">{event.participant_count || 0} participant(s)</p>
+                  </div>
                   {isAuthenticated && (
                     <div className="event-actions">
                       <button
@@ -481,9 +510,34 @@ function App() {
             <p><strong>Catégorie :</strong> {selectedEvent.category}</p>
             <p><strong>Participants :</strong> {selectedEvent.participant_count || 0}</p>
             <p><strong>Description :</strong> {selectedEvent.description}</p>
+            {isAuthenticated && user && selectedEvent.user_id === user.id && (
+              <button onClick={() => fetchParticipants(selectedEvent.id)} className="view-participants-btn">
+                Voir les participants
+              </button>
+            )}
             <button onClick={() => setSelectedEvent(null)} className="close-btn">Fermer</button>
           </div>
         )}
+      </Modal>
+      <Modal
+        isOpen={showParticipants}
+        onRequestClose={() => setShowParticipants(false)}
+        className="modal participants-modal"
+        overlayClassName="modal-overlay"
+      >
+        <div className="modal-content">
+          <h2>Participants</h2>
+          {participants.length > 0 ? (
+            <ul>
+              {participants.map((participant, index) => (
+                <li key={index}>{participant.username}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Aucun participant pour le moment.</p>
+          )}
+          <button onClick={() => setShowParticipants(false)} className="close-btn">Fermer</button>
+        </div>
       </Modal>
     </div>
   );
