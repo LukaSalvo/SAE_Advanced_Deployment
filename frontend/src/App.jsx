@@ -20,6 +20,15 @@ function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [error, setError] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const [showAttending, setShowAttending] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => setIsDarkMode(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -208,23 +217,191 @@ function App() {
   });
 
   return (
-    <div className="app-container">
-      <h1>Planificateur d’Événements</h1>
-      <div className="auth-status">
-        {isAuthenticated ? (
-          <div className="user-info">
-            <span>Bienvenue, {user?.username} {user?.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
-            <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); }} className="logout-btn">Déconnexion</button>
+    <div className={`app-container ${isDarkMode ? 'dark-mode' : ''}`}>
+      <header className="app-header">
+        <h1>PLANIF'EVENT</h1>
+        <div className="nav-buttons">
+          {isAuthenticated && (
+            <button onClick={() => setShowAttending(!showAttending)} className="nav-btn">
+              Événements auxquels j'assiste
+            </button>
+          )}
+          <div className="auth-status">
+            {isAuthenticated ? (
+              <div className="user-info">
+                <span>Bienvenue, {user?.username} {user?.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
+                <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); }} className="logout-btn">Déconnexion</button>
+              </div>
+            ) : (
+              <div className="auth-container">
+                <button onClick={() => setShowLogin(true)} className="auth-btn">Se connecter</button>
+                <button onClick={() => setShowRegister(true)} className="auth-btn">S'inscrire</button>
+                <span className="status-message">(Non connecté - Ajout réservé aux connectés)</span>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="auth-container">
-            <button onClick={() => setShowLogin(true)} className="auth-btn">Se connecter</button>
-            <button onClick={() => setShowRegister(true)} className="auth-btn">S'inscrire</button>
-            <span className="status-message">(Non connecté - Ajout réservé aux connectés)</span>
+        </div>
+      </header>
+      <main className="app-main">
+        {isAuthenticated && showAttending && attendingEvents.length > 0 && (
+          <div className="attending-section">
+            <h2>Événements auxquels vous assistez</h2>
+            <ul className="events-list">
+              {attendingEvents.map((event) => (
+                <li key={event.id} className="event-item">
+                  <span className="event-details" onClick={() => setSelectedEvent(event)}>
+                    {event.title} - {formatDateTime(event.date, event.time)} - {event.location}
+                    <span className="participant-count"> - {events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</span>
+                  </span>
+                  {isAuthenticated && (
+                    <div className="event-actions">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="edit-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="delete-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Supprimer
+                      </button>
+                      <button
+                        onClick={() => handleUnattend(event.id)}
+                        className="unattend-btn"
+                      >
+                        Se désinscrire
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-        {error && <div className="error-message">{error}</div>}
-      </div>
+        <div className="events-section">
+          <h2>Événements</h2>
+          <div className="filter-container">
+            <label>Filtrer par type : </label>
+            <select value={filter.type} onChange={(e) => setFilter({ ...filter, type: e.target.value })} className="filter-select">
+              <option value="all">Tous</option>
+              <option value="future">Futurs</option>
+              <option value="past">Passés</option>
+            </select>
+            <label>Filtrer par catégorie : </label>
+            <select value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })} className="filter-select">
+              <option value="all">Toutes</option>
+              <option value="Meetups entre passionnés">Meetups</option>
+              <option value="Ateliers de formation ou d’initiation">Ateliers</option>
+              <option value="Événements communautaires ou culturels">Communautaires</option>
+              <option value="Petits concerts, expositions, etc.">Concerts/Expos</option>
+            </select>
+          </div>
+          <ul className="events-list">
+            {filteredEvents.length > 0 ? (
+              filteredEvents.map((event) => (
+                <li key={event.id} className="event-item">
+                  <span className="event-details" onClick={() => setSelectedEvent(event)}>
+                    {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category})
+                    <span className="participant-count"> - {event.participant_count || 0} participant(s)</span>
+                  </span>
+                  {isAuthenticated && (
+                    <div className="event-actions">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="edit-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Modifier
+                      </button>
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="delete-btn"
+                        disabled={user && event.user_id !== user.id}
+                      >
+                        Supprimer
+                      </button>
+                      {!attendingEvents.find((e) => e.id === event.id) ? (
+                        <button
+                          onClick={() => handleAttend(event.id)}
+                          className="attend-btn"
+                          disabled={user && event.user_id === user.id}
+                        >
+                          Assister
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleUnattend(event.id)}
+                          className="unattend-btn"
+                        >
+                          Se désinscrire
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              ))
+            ) : (
+              <li className="no-events">Aucun événement à afficher.</li>
+            )}
+          </ul>
+        </div>
+        {isAuthenticated && !(!user.isProfessional && events.filter(event => event.user_id === user.id).length >= 3) ? (
+          <form onSubmit={handleSubmit} className="event-form">
+            <input
+              type="text"
+              placeholder="Titre"
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              required
+            />
+            <input
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              required
+            />
+            <input
+              type="time"
+              value={form.time}
+              onChange={(e) => setForm({ ...form, time: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Lieu"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+              required
+            />
+            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
+              <option value="Meetups entre passionnés">Meetups entre passionnés</option>
+              <option value="Ateliers de formation ou d’initiation">Ateliers de formation ou d’initiation</option>
+              <option value="Événements communautaires ou culturels">Événements communautaires ou culturels</option>
+              <option value="Petits concerts, expositions, etc.">Petits concerts, expositions, etc.</option>
+            </select>
+            <textarea
+              placeholder="Description"
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              required
+            />
+            <button type="submit">{editingId ? 'Modifier' : 'Créer'}</button>
+          </form>
+        ) : isAuthenticated ? (
+          <div className="login-prompt">
+            <p>Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.</p>
+            <button onClick={() => setShowRegister(true)} className="auth-btn">S'abonner</button>
+          </div>
+        ) : (
+          <div className="login-prompt">
+            <p>Connectez-vous pour ajouter ou modifier des événements.</p>
+            <button onClick={() => setShowLogin(true)} className="auth-btn">Se connecter</button>
+          </div>
+        )}
+      </main>
       <Modal
         isOpen={showLogin}
         onRequestClose={() => setShowLogin(false)}
@@ -290,164 +467,6 @@ function App() {
           <button onClick={() => setShowRegister(false)} className="close-btn">Fermer</button>
         </div>
       </Modal>
-      <div className="events-section">
-        <h2>Événements</h2>
-        <div className="filter-container">
-          <label>Filtrer par type : </label>
-          <select value={filter.type} onChange={(e) => setFilter({ ...filter, type: e.target.value })} className="filter-select">
-            <option value="all">Tous</option>
-            <option value="future">Futurs</option>
-            <option value="past">Passés</option>
-          </select>
-          <label>Filtrer par catégorie : </label>
-          <select value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })} className="filter-select">
-            <option value="all">Toutes</option>
-            <option value="Meetups entre passionnés">Meetups</option>
-            <option value="Ateliers de formation ou d’initiation">Ateliers</option>
-            <option value="Événements communautaires ou culturels">Communautaires</option>
-            <option value="Petits concerts, expositions, etc.">Concerts/Expos</option>
-          </select>
-        </div>
-        <ul className="events-list">
-          {filteredEvents.length > 0 ? (
-            filteredEvents.map((event) => (
-              <li key={event.id} className="event-item">
-                <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                  {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category}) 
-                  <span className="participant-count"> - {event.participant_count || 0} participant(s)</span>
-                </span>
-                {isAuthenticated && (
-                  <div className="event-actions">
-                    <button
-                      onClick={() => handleEdit(event)}
-                      className="edit-btn"
-                      disabled={user && event.user_id !== user.id}
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => handleDelete(event.id)}
-                      className="delete-btn"
-                      disabled={user && event.user_id !== user.id}
-                    >
-                      Supprimer
-                    </button>
-                    {!attendingEvents.find((e) => e.id === event.id) ? (
-                      <button
-                        onClick={() => handleAttend(event.id)}
-                        className="attend-btn"
-                        disabled={user && event.user_id === user.id}
-                      >
-                        Assister
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleUnattend(event.id)}
-                        className="unattend-btn"
-                      >
-                        Se désinscrire
-                      </button>
-                    )}
-                  </div>
-                )}
-              </li>
-            ))
-          ) : (
-            <li className="no-events">Aucun événement à afficher.</li>
-          )}
-        </ul>
-        {attendingEvents.length > 0 && (
-          <div className="attending-section">
-            <h2>Événements auxquels vous assistez</h2>
-            <ul className="events-list">
-              {attendingEvents.map((event) => (
-                <li key={event.id} className="event-item">
-                  <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                    {event.title} - {formatDateTime(event.date, event.time)} - {event.location}
-                    <span className="participant-count"> - {events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</span>
-                  </span>
-                  {isAuthenticated && (
-                    <div className="event-actions">
-                      <button
-                        onClick={() => handleEdit(event)}
-                        className="edit-btn"
-                        disabled={user && event.user_id !== user.id}
-                      >
-                        Modifier
-                      </button>
-                      <button
-                        onClick={() => handleDelete(event.id)}
-                        className="delete-btn"
-                        disabled={user && event.user_id !== user.id}
-                      >
-                        Supprimer
-                      </button>
-                      <button
-                        onClick={() => handleUnattend(event.id)}
-                        className="unattend-btn"
-                      >
-                        Se désinscrire
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-      {isAuthenticated && !(!user.isProfessional && events.filter(event => event.user_id === user.id).length >= 3) ? (
-        <form onSubmit={handleSubmit} className="event-form">
-          <input
-            type="text"
-            placeholder="Titre"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            required
-          />
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            required
-          />
-          <input
-            type="time"
-            value={form.time}
-            onChange={(e) => setForm({ ...form, time: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Lieu"
-            value={form.location}
-            onChange={(e) => setForm({ ...form, location: e.target.value })}
-            required
-          />
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
-            <option value="Meetups entre passionnés">Meetups entre passionnés</option>
-            <option value="Ateliers de formation ou d’initiation">Ateliers de formation ou d’initiation</option>
-            <option value="Événements communautaires ou culturels">Événements communautaires ou culturels</option>
-            <option value="Petits concerts, expositions, etc.">Petits concerts, expositions, etc.</option>
-          </select>
-          <textarea
-            placeholder="Description"
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            required
-          />
-          <button type="submit">{editingId ? 'Modifier' : 'Créer'}</button>
-        </form>
-      ) : isAuthenticated ? (
-        <div className="login-prompt">
-          <p>Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.</p>
-          <button onClick={() => setShowRegister(true)} className="auth-btn">S'abonner</button>
-        </div>
-      ) : (
-        <div className="login-prompt">
-          <p>Connectez-vous pour ajouter ou modifier des événements.</p>
-          <button onClick={() => setShowLogin(true)} className="auth-btn">Se connecter</button>
-        </div>
-      )}
       <Modal
         isOpen={!!selectedEvent}
         onRequestClose={() => setSelectedEvent(null)}
