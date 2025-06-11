@@ -1,7 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(255) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL
+  password VARCHAR(255) NOT NULL,
+  isProfessional BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -11,7 +12,8 @@ CREATE TABLE IF NOT EXISTS events (
   date DATE NOT NULL,
   time TIME,
   location VARCHAR(255) NOT NULL,
-  description TEXT
+  description TEXT,
+  category VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS user_events (

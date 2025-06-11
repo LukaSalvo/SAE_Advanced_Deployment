@@ -17,7 +17,6 @@ const pool = new Pool({
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
-
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -29,7 +28,6 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
-
 
 const isValidDate = (dateStr) => {
   const date = new Date(dateStr);
@@ -46,7 +44,6 @@ const formatDateForDB = (dateStr) => {
 app.get('/events', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM events');
-    
     const events = result.rows.map(event => ({
       ...event,
       date: formatDateForDB(event.date) || event.date 
@@ -61,7 +58,7 @@ app.get('/events', async (req, res) => {
 // Route pour le profil utilisateur
 app.get('/profile', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, username FROM users WHERE id = $1', [req.user.id]);
+    const result = await pool.query('SELECT id, username, isProfessional FROM users WHERE id = $1', [req.user.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Utilisateur non trouvé' });
     res.json(result.rows[0]);
   } catch (err) {
@@ -79,7 +76,7 @@ app.post('/login', async (req, res) => {
     if (!user || user.password !== password) {
       return res.status(401).json({ error: 'Identifiants incorrects' });
     }
-    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user.id, username: user.username, isProfessional: user.isProfessional }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (err) {
     console.error('Erreur lors de la connexion:', err);
@@ -89,24 +86,21 @@ app.post('/login', async (req, res) => {
 
 // Route pour l'inscription
 app.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, isProfessional } = req.body;
   try {
-    const result = await pool.query('INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id, username', [username, password]);
-    res.status(201).json(result.rows[0]);
+    const result = await pool.query(
+      'INSERT INTO users (username, password, isProfessional) VALUES ($1, $2, $3) RETURNING id, username, isProfessional',
+      [username, password, isProfessional || false]
+    );
+    const user = result.rows[0];
+    if (isProfessional) {
+      res.status(201).json({ ...user, message: 'Inscription professionnelle réussie. Paiement fictif de 7.99€ requis.' });
+    } else {
+      res.status(201).json(user);
+    }
   } catch (err) {
     console.error('Erreur lors de l\'inscription:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Route pour les événements
-app.get('/events', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM events');
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des événements:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Erreur serveur: ' + err.message });
   }
 });
 
@@ -126,15 +120,15 @@ app.get('/attending-events', authenticateToken, async (req, res) => {
 
 // Route pour ajouter un événement
 app.post('/events', authenticateToken, async (req, res) => {
-  const { title, date, time, location, description } = req.body;
+  const { title, date, time, location, description, category } = req.body;
   const formattedDate = formatDateForDB(date);
   if (!formattedDate) {
     return res.status(400).json({ error: 'Date invalide. Utilisez le format YYYY-MM-DD.' });
   }
   try {
     const result = await pool.query(
-      'INSERT INTO events (user_id, title, date, time, location, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.user.id, title, formattedDate, time, location, description]
+      'INSERT INTO events (user_id, title, date, time, location, description, category) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [req.user.id, title, formattedDate, time, location, description, category]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -146,15 +140,15 @@ app.post('/events', authenticateToken, async (req, res) => {
 // Route pour modifier un événement
 app.put('/events/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
-  const { title, date, time, location, description } = req.body;
+  const { title, date, time, location, description, category } = req.body;
   const formattedDate = formatDateForDB(date);
   if (!formattedDate) {
     return res.status(400).json({ error: 'Date invalide. Utilisez le format YYYY-MM-DD.' });
   }
   try {
     const result = await pool.query(
-      'UPDATE events SET title = $1, date = $2, time = $3, location = $4, description = $5 WHERE id = $6 AND user_id = $7 RETURNING *',
-      [title, formattedDate, time, location, description, id, req.user.id]
+      'UPDATE events SET title = $1, date = $2, time = $3, location = $4, description = $5, category = $6 WHERE id = $7 AND user_id = $8 RETURNING *',
+      [title, formattedDate, time, location, description, category, id, req.user.id]
     );
     if (result.rows.length === 0) return res.status(403).json({ error: 'Non autorisé ou événement non trouvé' });
     res.json(result.rows[0]);

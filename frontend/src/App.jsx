@@ -8,15 +8,15 @@ Modal.setAppElement('#root');
 function App() {
   const [events, setEvents] = useState([]);
   const [attendingEvents, setAttendingEvents] = useState([]);
-  const [form, setForm] = useState({ title: '', date: '', time: '', location: '', description: '' });
+  const [form, setForm] = useState({ title: '', date: '', time: '', location: '', description: '', category: 'Meetups entre passionnés' });
   const [editingId, setEditingId] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState({ type: 'all', category: 'all' });
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ username: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ username: '', password: '', isProfessional: false });
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [error, setError] = useState(null);
@@ -74,7 +74,6 @@ function App() {
     e.preventDefault();
     if (!isAuthenticated) return alert('Vous devez être connecté pour créer ou modifier un événement');
     
-    // Validation de la date
     const date = new Date(form.date);
     if (isNaN(date.getTime())) {
       setError('Date invalide. Utilisez le format YYYY-MM-DD.');
@@ -86,9 +85,15 @@ function App() {
         await axios.put(`http://localhost:3001/events/${editingId}`, form);
         setEditingId(null);
       } else {
+        // Vérifier le nombre d'événements créés
+        const userEvents = events.filter(event => event.user_id === user.id);
+        if (userEvents.length >= 3 && !user.isProfessional) {
+          setError('Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.');
+          return;
+        }
         await axios.post('http://localhost:3001/events', form);
       }
-      setForm({ title: '', date: '', time: '', location: '', description: '' });
+      setForm({ title: '', date: '', time: '', location: '', description: '', category: 'Meetups entre passionnés' });
       fetchEvents();
       setError(null);
     } catch (err) {
@@ -115,6 +120,7 @@ function App() {
       time: event.time || '',
       location: event.location,
       description: event.description,
+      category: event.category || 'Meetups entre passionnés',
     });
     setEditingId(event.id);
   };
@@ -130,19 +136,19 @@ function App() {
     }
   };
 
- const formatDateTime = (dateString, timeString) => {
-  const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
-  if (isNaN(date.getTime())) {
-    return 'Date invalide'; 
-  }
-  return date.toLocaleString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+  const formatDateTime = (dateString, timeString) => {
+    const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
+    if (isNaN(date.getTime())) {
+      return 'Date invalide';
+    }
+    return date.toLocaleString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -164,9 +170,13 @@ function App() {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:3001/register', registerForm);
+      const res = await axios.post('http://localhost:3001/register', registerForm);
       setShowRegister(false);
-      setError('Inscription réussie, veuillez vous connecter');
+      if (registerForm.isProfessional) {
+        setError('Inscription professionnelle réussie. Paiement fictif de 7.99€ requis.');
+      } else {
+        setError('Inscription réussie, veuillez vous connecter');
+      }
     } catch (err) {
       setError('Échec de l\'inscription : ' + (err.response?.data?.error || err.message));
     }
@@ -176,18 +186,20 @@ function App() {
     const eventDate = new Date(event.date + 'T' + (event.time || '00:00:00'));
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (filter === 'future') return eventDate >= today;
-    if (filter === 'past') return eventDate < today;
-    return true;
+    const matchesType = (filter.type === 'all' || 
+      (filter.type === 'future' && eventDate >= today) || 
+      (filter.type === 'past' && eventDate < today));
+    const matchesCategory = (filter.category === 'all' || event.category === filter.category);
+    return matchesType && matchesCategory;
   });
 
   return (
     <div className="app-container">
-      <h1>Planificateur d'événements</h1>
+      <h1>Planificateur d’Événements</h1>
       <div className="auth-status">
         {isAuthenticated ? (
           <div className="user-info">
-            <span>Bienvenue, {user?.username} (Connecté)</span>
+            <span>Bienvenue, {user?.username} {user?.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
             <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); }} className="logout-btn">Déconnexion</button>
           </div>
         ) : (
@@ -251,6 +263,13 @@ function App() {
               onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
               required
             />
+            <label>
+              <input
+                type="checkbox"
+                checked={registerForm.isProfessional}
+                onChange={(e) => setRegisterForm({ ...registerForm, isProfessional: e.target.checked })}
+              /> Inscription en tant que professionnel (7.99€/mois fictif)
+            </label>
             <button type="submit">S'inscrire</button>
           </form>
           {error && <p className="error-message">{error}</p>}
@@ -260,11 +279,19 @@ function App() {
       <div className="events-section">
         <h2>Événements</h2>
         <div className="filter-container">
-          <label>Filtrer : </label>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="filter-select">
+          <label>Filtrer par type : </label>
+          <select value={filter.type} onChange={(e) => setFilter({ ...filter, type: e.target.value })} className="filter-select">
             <option value="all">Tous</option>
             <option value="future">Futurs</option>
             <option value="past">Passés</option>
+          </select>
+          <label>Filtrer par catégorie : </label>
+          <select value={filter.category} onChange={(e) => setFilter({ ...filter, category: e.target.value })} className="filter-select">
+            <option value="all">Toutes</option>
+            <option value="Meetups entre passionnés">Meetups</option>
+            <option value="Ateliers de formation ou d’initiation">Ateliers</option>
+            <option value="Événements communautaires ou culturels">Communautaires</option>
+            <option value="Petits concerts, expositions, etc.">Concerts/Expos</option>
           </select>
         </div>
         <ul className="events-list">
@@ -272,7 +299,7 @@ function App() {
             filteredEvents.map((event) => (
               <li key={event.id} className="event-item">
                 <span className="event-details" onClick={() => setSelectedEvent(event)}>
-                  {event.title} - {formatDateTime(event.date, event.time)} - {event.location}
+                  {event.title} - {formatDateTime(event.date, event.time)} - {event.location} ({event.category})
                 </span>
                 <div className="event-actions">
                   <button
@@ -363,6 +390,12 @@ function App() {
             onChange={(e) => setForm({ ...form, location: e.target.value })}
             required
           />
+          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required>
+            <option value="Meetups entre passionnés">Meetups entre passionnés</option>
+            <option value="Ateliers de formation ou d’initiation">Ateliers de formation ou d’initiation</option>
+            <option value="Événements communautaires ou culturels">Événements communautaires ou culturels</option>
+            <option value="Petits concerts, expositions, etc.">Petits concerts, expositions, etc.</option>
+          </select>
           <textarea
             placeholder="Description"
             value={form.description}
@@ -388,6 +421,7 @@ function App() {
             <h2>{selectedEvent.title}</h2>
             <p><strong>Date :</strong> {formatDateTime(selectedEvent.date, selectedEvent.time)}</p>
             <p><strong>Lieu :</strong> {selectedEvent.location}</p>
+            <p><strong>Catégorie :</strong> {selectedEvent.category}</p>
             <p><strong>Description :</strong> {selectedEvent.description}</p>
             <button onClick={() => setSelectedEvent(null)} className="close-btn">Fermer</button>
           </div>
