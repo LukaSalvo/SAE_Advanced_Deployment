@@ -20,10 +20,15 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
+  console.log('Headers reçus:', req.headers);
+  console.log('Vérification du token:', token);
   if (!token) return res.status(401).json({ error: 'Token manquant' });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: 'Token invalide' });
+    if (err) {
+      console.error('Erreur de vérification du token:', err.message);
+      return res.status(403).json({ error: 'Token invalide' });
+    }
     req.user = user;
     next();
   });
@@ -56,6 +61,21 @@ app.get('/events', async (req, res) => {
     res.json(events);
   } catch (err) {
     console.error('Erreur lors de la récupération des événements:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour les participants d'un événement
+app.get('/events/:id/participants', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT u.username FROM users u JOIN user_events ue ON u.id = ue.user_id WHERE ue.event_id = $1',
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des participants:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -120,13 +140,17 @@ app.get('/profile', authenticateToken, async (req, res) => {
 // Route pour la connexion
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
+  console.log('Tentative de connexion - Username:', username, 'Password:', password);
   try {
     const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     const user = result.rows[0];
+    console.log('Utilisateur trouvé:', user);
     if (!user || user.password !== password) {
+      console.log('Identifiants incorrects');
       return res.status(401).json({ error: 'Identifiants incorrects' });
     }
     const token = jwt.sign({ id: user.id, username: user.username, isProfessional: user.isProfessional }, JWT_SECRET, { expiresIn: '1h' });
+    console.log('Token généré:', token);
     res.json({ token });
   } catch (err) {
     console.error('Erreur lors de la connexion:', err);
@@ -138,6 +162,10 @@ app.post('/login', async (req, res) => {
 app.post('/register', async (req, res) => {
   const { username, password, isProfessional } = req.body;
   try {
+    const checkResult = await pool.query('SELECT COUNT(*) FROM users WHERE username = $1', [username]);
+    if (checkResult.rows[0].count > 0) {
+      return res.status(400).json({ error: 'Ce nom d\'utilisateur est déjà pris.' });
+    }
     const result = await pool.query(
       'INSERT INTO users (username, password, isProfessional) VALUES ($1, $2, $3) RETURNING id, username, isProfessional',
       [username, password, isProfessional || false]
@@ -151,20 +179,6 @@ app.post('/register', async (req, res) => {
   } catch (err) {
     console.error('Erreur lors de l\'inscription:', err);
     res.status(500).json({ error: 'Erreur serveur: ' + err.message });
-  }
-});
-
-// Route pour les événements auxquels l'utilisateur assiste
-app.get('/attending-events', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT e.* FROM events e JOIN user_events ue ON e.id = ue.event_id WHERE ue.user_id = $1',
-      [req.user.id]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des événements auxquels vous assistez:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 

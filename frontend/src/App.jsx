@@ -14,8 +14,8 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Initialement false jusqu'à vérification
+  const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [user, setUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ username: '', password: '', isProfessional: false });
@@ -24,6 +24,7 @@ function App() {
   const [error, setError] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [showAttending, setShowAttending] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Ajout pour gérer le chargement initial
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -33,28 +34,33 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetchEvents();
-    if (token) {
-      axios.defaults.headers.Authorization = `Bearer ${token}`;
-      fetchUser();
-      fetchAttendingEvents();
+    const storedToken = localStorage.getItem('token');
+    console.log('Token stocké au chargement:', storedToken);
+    if (storedToken) {
+      setToken(storedToken);
+      fetchUser(storedToken).finally(() => setIsLoading(false)); // Arrêter le chargement après fetch
     } else {
-      setIsAuthenticated(false);
+      setIsLoading(false); // Pas de token, pas de chargement
     }
-  }, [token]);
+  }, []);
 
-  const fetchUser = async () => {
+  const fetchUser = async (authToken) => {
+    console.log('Tentative de fetchUser avec token:', authToken);
+    console.log('Headers envoyés:', { Authorization: `Bearer ${authToken}` });
     try {
       const res = await axios.get('http://localhost:3001/profile', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
       setUser(res.data);
       setIsAuthenticated(true);
       setError(null);
+      console.log('Utilisateur chargé avec succès:', res.data);
     } catch (err) {
+      console.error('Erreur fetchUser:', err.response?.data || err.message);
       setIsAuthenticated(false);
       localStorage.removeItem('token');
-      setError('Erreur de profil utilisateur : ' + (err.response?.data?.error || err.message));
+      setToken(null);
+      setError('Erreur d’authentification : ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -70,7 +76,9 @@ function App() {
 
   const fetchAttendingEvents = async () => {
     try {
-      const res = await axios.get('http://localhost:3001/attending-events');
+      const res = await axios.get('http://localhost:3001/attending-events', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setAttendingEvents(res.data.map(event => ({
         ...event,
         date: event.date || '1970-01-01'
@@ -106,7 +114,9 @@ function App() {
 
     try {
       if (editingId) {
-        await axios.put(`http://localhost:3001/events/${editingId}`, form);
+        await axios.put(`http://localhost:3001/events/${editingId}`, form, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         setEditingId(null);
       } else {
         const userEvents = events.filter(event => event.user_id === user.id);
@@ -114,7 +124,9 @@ function App() {
           setError('Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.');
           return;
         }
-        await axios.post('http://localhost:3001/events', form);
+        await axios.post('http://localhost:3001/events', form, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
       }
       setForm({ title: '', date: '', time: '', location: '', description: '', category: 'Meetups entre passionnés' });
       fetchEvents();
@@ -127,7 +139,9 @@ function App() {
   const handleDelete = async (id) => {
     if (!isAuthenticated) return alert('Vous devez être connecté pour supprimer un événement');
     try {
-      await axios.delete(`http://localhost:3001/events/${id}`);
+      await axios.delete(`http://localhost:3001/events/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchEvents();
       setError(null);
     } catch (err) {
@@ -156,7 +170,9 @@ function App() {
       return;
     }
     try {
-      await axios.post(`http://localhost:3001/events/${id}/attend`);
+      await axios.post(`http://localhost:3001/events/${id}/attend`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchAttendingEvents();
       setError(null);
     } catch (err) {
@@ -167,7 +183,9 @@ function App() {
   const handleUnattend = async (id) => {
     if (!isAuthenticated) return alert('Vous devez être connecté pour vous désinscrire');
     try {
-      await axios.delete(`http://localhost:3001/events/${id}/unattend`);
+      await axios.delete(`http://localhost:3001/events/${id}/unattend`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       fetchAttendingEvents();
       setError(null);
     } catch (err) {
@@ -192,15 +210,20 @@ function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    console.log('Tentative de login avec:', loginForm);
     try {
-      const res = await axios.post('http://localhost:3001/login', loginForm);
+      const res = await axios.post('http://localhost:3001/login', loginForm, {
+        headers: { 'Content-Type': 'application/json' },
+      });
       const newToken = res.data.token;
+      console.log('Token reçu du backend:', newToken);
       localStorage.setItem('token', newToken);
+      await fetchUser(newToken);
       setToken(newToken);
-      axios.defaults.headers.Authorization = `Bearer ${newToken}`;
       setShowLogin(false);
-      await fetchUser();
+      console.log('Après fetchUser, isAuthenticated:', isAuthenticated);
     } catch (err) {
+      console.error('Erreur login:', err.response?.data || err.message);
       setError('Échec de la connexion : ' + (err.response?.data?.error || err.message));
     }
   };
@@ -231,21 +254,25 @@ function App() {
     return matchesType && matchesCategory;
   });
 
+  if (isLoading) {
+    return <div>Chargement...</div>; // Écran de chargement pendant l'initialisation
+  }
+
   return (
     <div className={`app-container ${isDarkMode ? 'dark-mode' : ''}`}>
       <header className="app-header">
         <h1>PLANIF'EVENT</h1>
         <div className="nav-buttons">
-          {isAuthenticated && (
+          {isAuthenticated && user && (
             <button onClick={() => setShowAttending(!showAttending)} className="nav-btn">
               Événements auxquels j'assiste
             </button>
           )}
           <div className="auth-status">
-            {isAuthenticated ? (
+            {isAuthenticated && user ? (
               <div className="user-info">
-                <span>Bienvenue, {user?.username} {user?.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
-                <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); }} className="logout-btn">Déconnexion</button>
+                <span>Bienvenue, {user.username} {user.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
+                <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); setUser(null); }} className="logout-btn">Déconnexion</button>
               </div>
             ) : (
               <div className="auth-container">
@@ -258,7 +285,7 @@ function App() {
         </div>
       </header>
       <main className="app-main">
-        {isAuthenticated && showAttending && attendingEvents.length > 0 && (
+        {isAuthenticated && user && showAttending && attendingEvents.length > 0 && (
           <div className="attending-section">
             <h2>Événements auxquels vous assistez</h2>
             <ul className="events-list">
@@ -275,7 +302,7 @@ function App() {
                     <p>{formatDateTime(event.date, event.time)} - {event.location}</p>
                     <p className="participant-count">{events.find(e => e.id === event.id)?.participant_count || 0} participant(s)</p>
                   </div>
-                  {isAuthenticated && (
+                  {isAuthenticated && user && (
                     <div className="event-actions">
                       <button
                         onClick={() => handleEdit(event)}
@@ -337,7 +364,7 @@ function App() {
                     <p>{formatDateTime(event.date, event.time)} - {event.location} ({event.category})</p>
                     <p className="participant-count">{event.participant_count || 0} participant(s)</p>
                   </div>
-                  {isAuthenticated && (
+                  {isAuthenticated && user && (
                     <div className="event-actions">
                       <button
                         onClick={() => handleEdit(event)}
@@ -378,7 +405,7 @@ function App() {
             )}
           </ul>
         </div>
-        {isAuthenticated && !(!user.isProfessional && events.filter(event => event.user_id === user.id).length >= 3) ? (
+        {isAuthenticated && user && !(!user.isProfessional && events.filter(event => event.user_id === user.id).length >= 3) ? (
           <form onSubmit={handleSubmit} className="event-form">
             <input
               type="text"
@@ -419,7 +446,7 @@ function App() {
             />
             <button type="submit">{editingId ? 'Modifier' : 'Créer'}</button>
           </form>
-        ) : isAuthenticated ? (
+        ) : isAuthenticated && user ? (
           <div className="login-prompt">
             <p>Limite de 3 événements gratuits atteinte. Abonnez-vous pour plus.</p>
             <button onClick={() => setShowRegister(true)} className="auth-btn">S'abonner</button>
