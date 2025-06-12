@@ -1,3 +1,15 @@
+
+/**
+ * PArtie frontend de l'application Planif'Event
+ * Cette partie gère l'interface utilisateur, les formulaires d'événements,
+ * la connexion, l'inscription, et l'affichage des événements.
+ * Elle utilise React pour la gestion de l'état et Axios pour les requêtes HTTP.
+ * Elle inclut également des modales pour la connexion, l'inscription et l'affichage des détails des événements.
+ * Elle permet aux utilisateurs de filtrer les événements par type et catégorie,
+ * ainsi que de gérer les participations aux événements.
+ * Elle supporte un mode sombre pour une meilleure expérience utilisateur.
+ */
+
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
@@ -5,7 +17,15 @@ import Modal from 'react-modal';
 
 Modal.setAppElement('#root');
 
+// Configuration de la bibliothèque Axios pour les requêtes HTTP
 function App() {
+
+  /**
+   * Constantes et états de l'application,
+   * y compris les événements, les formulaires,
+   * les filtres, l'authentification,
+   * et les préférences utilisateur.
+   */
   const [events, setEvents] = useState([]);
   const [attendingEvents, setAttendingEvents] = useState([]);
   const [form, setForm] = useState({ title: '', date: '', time: '', location: '', description: '', category: 'Meetups entre passionnés' });
@@ -24,6 +44,7 @@ function App() {
   const [error, setError] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+    // Fonction pour formater la date et l'heure
   const formatDateTime = (dateString, timeString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -35,6 +56,7 @@ function App() {
     return formattedDate;
   };
 
+    // Fonction pour récupérer les événements, les événements auxquels l'utilisateur participe,
   const fetchEvents = async () => {
     try {
       const response = await axios.get('http://localhost:3001/events');
@@ -45,6 +67,7 @@ function App() {
     }
   };
 
+    // Fonction pour récupérer les événements auxquels l'utilisateur participe
   const fetchAttendingEvents = async () => {
     try {
       const response = await axios.get('http://localhost:3001/attending-events', { headers: { Authorization: `Bearer ${token}` } });
@@ -55,6 +78,7 @@ function App() {
     }
   };
 
+    // Fonction pour récupérer le profil de l'utilisateur
   const fetchProfile = async () => {
     if (token) {
       try {
@@ -71,6 +95,7 @@ function App() {
     }
   };
 
+    // Effet pour charger les événements et le profil utilisateur au démarrage
   useEffect(() => {
     fetchEvents();
     if (token) {
@@ -79,6 +104,7 @@ function App() {
     }
   }, [token]);
 
+    // Fonction pour gérer la soumission du formulaire d'événement
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -96,6 +122,7 @@ function App() {
     }
   };
 
+    // Fonction pour gérer la suppression d'un événement
   const handleDelete = async (id) => {
     setError(null);
     try {
@@ -106,6 +133,7 @@ function App() {
     }
   };
 
+    // Fonction pour gérer l'édition d'un événement
   const handleEdit = (event) => {
     setEditingId(event.id);
     setForm({
@@ -118,6 +146,7 @@ function App() {
     });
   };
 
+    // Fonction pour gérer l'inscription à un événement
   const handleAttend = async (eventId) => {
     setError(null);
     try {
@@ -129,6 +158,7 @@ function App() {
     }
   };
 
+    // Fonction pour gérer la désinscription d'un événement
   const handleUnattend = async (eventId) => {
     setError(null);
     try {
@@ -140,6 +170,7 @@ function App() {
     }
   };
 
+    // Fonction pour récupérer les participants d'un événement
   const fetchParticipants = async (eventId) => {
     setError(null);
     try {
@@ -151,10 +182,12 @@ function App() {
     }
   };
 
+    // Fonction pour gérer les changements de filtre
   const handleFilterChange = (e) => {
     setFilter({ ...filter, [e.target.name]: e.target.value });
   };
 
+    // Filtrer les événements en fonction des critères sélectionnés
   const filteredEvents = events.filter(event => {
     const matchesType = filter.type === 'all' ||
       (filter.type === 'my-events' && isAuthenticated && event.user_id === user?.id) ||
@@ -163,6 +196,7 @@ function App() {
     return matchesType && matchesCategory;
   });
 
+    // Fonction pour gérer la soumission du formulaire de connexion
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -181,6 +215,7 @@ function App() {
     }
   };
 
+    // Fonction pour gérer la soumission du formulaire d'inscription
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -194,6 +229,7 @@ function App() {
     }
   };
 
+    // Fonction pour gérer la déconnexion
   const handleLogout = () => {
     localStorage.removeItem('token');
     setToken(null);
@@ -204,11 +240,13 @@ function App() {
     fetchEvents();
   };
 
+    // Fonction pour basculer entre le mode sombre et le mode clair
   const toggleDarkMode = () => {
     setIsDarkMode(prev => !prev);
     document.body.classList.toggle('dark-mode', !isDarkMode);
   };
 
+    // Effet pour appliquer le mode sombre en fonction de l'état isDarkMode
   useEffect(() => {
     document.body.classList.toggle('dark-mode', isDarkMode);
   }, [isDarkMode]);

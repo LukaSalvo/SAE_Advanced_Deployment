@@ -1,16 +1,26 @@
-// backend/index.js
-require('dotenv').config(); // Cette ligne reste pour compatibilité si aucune variable _FILE n'est définie
+/**
+ * Partie backend de l'application, gérant l'API REST pour les événements.
+ * Il utilise Express pour le serveur, PostgreSQL pour la base de données,
+ * et JWT pour l'authentification.
+ * Il inclut des fonctionnalités pour l'inscription, la connexion,
+ * la création, la mise à jour, la suppression d'événements,
+ * ainsi que la gestion des participants.
+ */
+
+require('dotenv').config();
 const express = require('express');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
-const fs = require('fs'); // Ajout pour lire les fichiers secrets
+const fs = require('fs');
 
+// Vérification des variables d'environnement nécessaires
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: 'http://localhost:3000' }));
 
+// Chargement des variables d'environnement
 const dbUser = process.env.DB_USER_FILE ? fs.readFileSync(process.env.DB_USER_FILE, 'utf8').trim() : process.env.DB_USER;
 const dbPassword = process.env.DB_PASSWORD_FILE ? fs.readFileSync(process.env.DB_PASSWORD_FILE, 'utf8').trim() : process.env.DB_PASSWORD;
 const dbHost = process.env.DB_HOST || 'localhost';
@@ -18,6 +28,7 @@ const dbName = process.env.DB_NAME || 'events_db';
 const dbPort = process.env.DB_PORT || 5432;
 const JWT_SECRET = process.env.JWT_SECRET_FILE ? fs.readFileSync(process.env.JWT_SECRET_FILE, 'utf8').trim() : process.env.JWT_SECRET || 'your_jwt_secret_key';
 
+// Création de la connexion à la base de données PostgreSQL
 const pool = new Pool({
   user: dbUser,
   host: dbHost,
@@ -26,6 +37,7 @@ const pool = new Pool({
   port: dbPort,
 });
 
+// Vérification de la connexion à la base de données
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -41,6 +53,7 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Fonction pour valider le format de la date (AAAA-MM-JJ)
 const isValidDate = (dateStr) => {
   const date = new Date(dateStr);
   return !isNaN(date.getTime()) && dateStr.match(/^\d{4}-\d{2}-\d{2}$/);
@@ -332,6 +345,7 @@ app.get('/events/:id/participants', authenticateToken, async (req, res) => {
   }
 });
 
+// Route de test pour vérifier que le serveur fonctionne
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Serveur démarré sur le port ${PORT}`);
