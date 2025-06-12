@@ -45,7 +45,7 @@ const formatDateForDB = (dateStr) => {
   return date.toISOString().split('T')[0]; 
 };
 
-// Route pour les événements avec nombre de participants
+// Route pour récupérer tous les événements
 app.get('/events', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -56,7 +56,7 @@ app.get('/events', async (req, res) => {
     `);
     const events = result.rows.map(event => ({
       ...event,
-      date: formatDateForDB(event.date) || event.date 
+      date: event.date ? event.date.toISOString().split('T')[0] : '1970-01-01'
     }));
     res.json(events);
   } catch (err) {
@@ -65,7 +65,25 @@ app.get('/events', async (req, res) => {
   }
 });
 
-// Route pour les participants d'un événement
+// Route pour récupérer les événements auxquels l'utilisateur assiste
+app.get('/attending-events', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT e.* FROM events e JOIN user_events ue ON e.id = ue.event_id WHERE ue.user_id = $1',
+      [req.user.id]
+    );
+    const events = result.rows.map(event => ({
+      ...event,
+      date: event.date ? event.date.toISOString().split('T')[0] : '1970-01-01'
+    }));
+    res.json(events);
+  } catch (err) {
+    console.error('Erreur lors de la récupération des événements auxquels vous assistez:', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// Route pour récupérer les participants d'un événement
 app.get('/events/:id/participants', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {
@@ -76,20 +94,6 @@ app.get('/events/:id/participants', authenticateToken, async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Erreur lors de la récupération des participants:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Route pour les événements auxquels l'utilisateur assiste
-app.get('/attending-events', authenticateToken, async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT e.* FROM events e JOIN user_events ue ON e.id = ue.event_id WHERE ue.user_id = $1',
-      [req.user.id]
-    );
-    res.json(result.rows);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des événements auxquels vous assistez:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -106,21 +110,6 @@ app.delete('/events/:id/unattend', authenticateToken, async (req, res) => {
     res.json({ message: 'Désinscription réussie' });
   } catch (err) {
     console.error('Erreur lors de la désinscription:', err);
-    res.status(500).json({ error: 'Erreur serveur' });
-  }
-});
-
-// Route pour les événements
-app.get('/events', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM events');
-    const events = result.rows.map(event => ({
-      ...event,
-      date: formatDateForDB(event.date) || event.date 
-    }));
-    res.json(events);
-  } catch (err) {
-    console.error('Erreur lors de la récupération des événements:', err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
@@ -246,6 +235,9 @@ app.post('/events/:id/attend', authenticateToken, async (req, res) => {
   try {
     const eventResult = await pool.query('SELECT user_id FROM events WHERE id = $1', [id]);
     if (eventResult.rows.length === 0) return res.status(404).json({ error: 'Événement non trouvé' });
+    if (eventResult.rows[0].user_id === req.user.id) {
+      return res.status(400).json({ error: 'Vous ne pouvez pas assister à votre propre événement' });
+    }
     await pool.query('INSERT INTO user_events (user_id, event_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [req.user.id, id]);
     res.json({ message: 'Inscription réussie' });
   } catch (err) {

@@ -77,8 +77,6 @@ body.dark-mode .error-message {
   box-sizing: border-box; /* Inclut le padding dans la largeur totale */
 }
 
-
-
 .app-header h1 {
   margin: 0;
   font-size: 1.8em;
@@ -162,8 +160,6 @@ body.dark-mode .error-message {
   gap: 10px;
   align-items: center;
 }
-
-
 
 .event-form {
   display: grid;
@@ -254,7 +250,6 @@ body.dark-mode .error-message {
   outline: none;
 }
 
-
 .events-list {
   list-style: none;
   padding: 0;
@@ -281,7 +276,6 @@ body.dark-mode .error-message {
   overflow: hidden;
   position: relative;
 }
-
 
 .event-item:hover {
   transform: translateY(-10px);
@@ -523,8 +517,23 @@ body.dark-mode .modal.event-modal {
   background-color: var(--card-bg-light);
 }
 
+.participants-modal .modal-content ul {
+  list-style: none;
+  padding: 0;
+  text-align: left;
+}
+
+.participants-modal .modal-content li {
+  padding: 5px 0;
+  color: var(--text-light);
+}
+
 body.dark-mode .participants-modal .modal-content {
   background-color: var(--card-bg-dark);
+}
+
+body.dark-mode .participants-modal .modal-content li {
+  color: var(--text-dark);
 }
 
 .view-participants-btn {

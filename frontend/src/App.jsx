@@ -14,7 +14,7 @@ function App() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // Initialement false jusqu'à vérification
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [user, setUser] = useState(null);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -24,7 +24,7 @@ function App() {
   const [error, setError] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const [showAttending, setShowAttending] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Ajout pour gérer le chargement initial
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -34,15 +34,21 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    console.log('Token stocké au chargement:', storedToken);
-    if (storedToken) {
-      setToken(storedToken);
-      fetchUser(storedToken).finally(() => setIsLoading(false)); // Arrêter le chargement après fetch
-    } else {
-      setIsLoading(false); // Pas de token, pas de chargement
-    }
-  }, []);
+  const storedToken = localStorage.getItem('token');
+  if (storedToken) {
+    setToken(storedToken);
+    fetchUser(storedToken).finally(() => {
+      fetchEvents();
+      // Appel explicite uniquement après la première connexion
+      if (!user) {
+        fetchAttendingEvents(); // Ne récupère que les événements existants
+      }
+      setIsLoading(false);
+    });
+  } else {
+    fetchEvents().finally(() => setIsLoading(false));
+  }
+}, []);
 
   const fetchUser = async (authToken) => {
     console.log('Tentative de fetchUser avec token:', authToken);
@@ -55,6 +61,7 @@ function App() {
       setIsAuthenticated(true);
       setError(null);
       console.log('Utilisateur chargé avec succès:', res.data);
+      fetchAttendingEvents();
     } catch (err) {
       console.error('Erreur fetchUser:', err.response?.data || err.message);
       setIsAuthenticated(false);
@@ -70,24 +77,26 @@ function App() {
       setEvents(res.data);
       setError(null);
     } catch (err) {
+      console.error('Erreur lors du chargement des événements:', err);
       setError('Erreur lors du chargement des événements : ' + (err.response?.data?.error || err.message));
     }
   };
 
   const fetchAttendingEvents = async () => {
-    try {
-      const res = await axios.get('http://localhost:3001/attending-events', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setAttendingEvents(res.data.map(event => ({
-        ...event,
-        date: event.date || '1970-01-01'
-      })));
-      setError(null);
-    } catch (err) {
-      setError('Erreur lors du chargement des événements auxquels vous assistez : ' + err.message);
-    }
-  };
+  if (!token) return;
+  try {
+    const res = await axios.get('http://localhost:3001/attending-events', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setAttendingEvents(res.data.map(event => ({
+      ...event,
+      date: event.date || '1970-01-01'
+    })));
+    setError(null);
+  } catch (err) {
+    setError('Erreur lors du chargement des événements auxquels vous assistez : ' + err.message);
+  }
+};
 
   const fetchParticipants = async (eventId) => {
     try {
@@ -98,7 +107,9 @@ function App() {
       setShowParticipants(true);
       setError(null);
     } catch (err) {
+      console.error('Erreur lors de la récupération des participants:', err);
       setError('Erreur lors de la récupération des participants : ' + (err.response?.data?.error || err.message));
+      setParticipants([]); // Réinitialise la liste en cas d'erreur
     }
   };
 
@@ -194,9 +205,13 @@ function App() {
   };
 
   const formatDateTime = (dateString, timeString) => {
-    if (!dateString || dateString === '1970-01-01') return 'Date non disponible';
-    const date = new Date(dateString + 'T' + (timeString || '00:00:00'));
+    if (!dateString || dateString === '1970-01-01' || !dateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return 'Date non disponible';
+    }
+    const time = timeString ? timeString : '00:00:00';
+    const date = new Date(`${dateString}T${time}`);
     if (isNaN(date.getTime())) {
+      console.warn('Date invalide détectée:', dateString, timeString);
       return 'Date invalide';
     }
     return date.toLocaleString('fr-FR', {
@@ -255,7 +270,7 @@ function App() {
   });
 
   if (isLoading) {
-    return <div>Chargement...</div>; // Écran de chargement pendant l'initialisation
+    return <div>Chargement...</div>;
   }
 
   return (
@@ -272,7 +287,7 @@ function App() {
             {isAuthenticated && user ? (
               <div className="user-info">
                 <span>Bienvenue, {user.username} {user.isProfessional ? '(Professionnel)' : '(Utilisateur)'}</span>
-                <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); setUser(null); }} className="logout-btn">Déconnexion</button>
+                <button onClick={() => { setToken(null); localStorage.removeItem('token'); setIsAuthenticated(false); setUser(null); fetchEvents(); }} className="logout-btn">Déconnexion</button>
               </div>
             ) : (
               <div className="auth-container">
@@ -307,14 +322,14 @@ function App() {
                       <button
                         onClick={() => handleEdit(event)}
                         className="edit-btn"
-                        disabled={user && event.user_id !== user.id}
+                        disabled={true}
                       >
                         Modifier
                       </button>
                       <button
                         onClick={() => handleDelete(event.id)}
                         className="delete-btn"
-                        disabled={user && event.user_id !== user.id}
+                        disabled={true}
                       >
                         Supprimer
                       </button>
@@ -376,7 +391,7 @@ function App() {
                       <button
                         onClick={() => handleDelete(event.id)}
                         className="delete-btn"
-                        disabled={user && event.user_id !== user.id}
+                        disabled={editingId === event.id || user && event.user_id !== user.id}
                       >
                         Supprimer
                       </button>
