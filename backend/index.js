@@ -1,25 +1,30 @@
 // backend/index.js
-require('dotenv').config(); // Cette ligne doit toujours être la première
-
+require('dotenv').config(); // Cette ligne reste pour compatibilité si aucune variable _FILE n'est définie
 const express = require('express');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-const bcrypt = require('bcryptjs'); // Utilisez 'bcryptjs' comme dans votre package.json
+const bcrypt = require('bcryptjs');
+const fs = require('fs'); // Ajout pour lire les fichiers secrets
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:3000' })); // Assurez-vous que l'origine correspond à votre frontend
+app.use(cors({ origin: 'http://localhost:3000' }));
+
+const dbUser = process.env.DB_USER_FILE ? fs.readFileSync(process.env.DB_USER_FILE, 'utf8').trim() : process.env.DB_USER;
+const dbPassword = process.env.DB_PASSWORD_FILE ? fs.readFileSync(process.env.DB_PASSWORD_FILE, 'utf8').trim() : process.env.DB_PASSWORD;
+const dbHost = process.env.DB_HOST || 'localhost';
+const dbName = process.env.DB_NAME || 'events_db';
+const dbPort = process.env.DB_PORT || 5432;
+const JWT_SECRET = process.env.JWT_SECRET_FILE ? fs.readFileSync(process.env.JWT_SECRET_FILE, 'utf8').trim() : process.env.JWT_SECRET || 'your_jwt_secret_key';
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  user: dbUser,
+  host: dbHost,
+  database: dbName,
+  password: dbPassword,
+  port: dbPort,
 });
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -49,7 +54,6 @@ app.post('/register', async (req, res) => {
   }
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    // Note: Utilisation de 'password_hash' et 'is_professional' pour la cohérence du schéma DB
     const result = await pool.query(
       'INSERT INTO users (username, password_hash, is_professional) VALUES ($1, $2, $3) RETURNING id, username, is_professional',
       [username, hashedPassword, isProfessional || false]
@@ -71,14 +75,13 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Nom d\'utilisateur et mot de passe sont requis.' });
   }
   try {
-    // Note: Sélectionne 'password_hash' et 'is_professional'
     const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
     if (result.rows.length === 0) {
       return res.status(400).json({ error: 'Nom d\'utilisateur ou mot de passe invalide' });
     }
 
     const user = result.rows[0];
-    const validPassword = await bcrypt.compare(password, user.password_hash); // Utilise 'password_hash'
+    const validPassword = await bcrypt.compare(password, user.password_hash);
     if (!validPassword) {
       return res.status(400).json({ error: 'Nom d\'utilisateur ou mot de passe invalide' });
     }
@@ -94,7 +97,6 @@ app.post('/login', async (req, res) => {
 // Route pour récupérer le profil de l'utilisateur connecté
 app.get('/profile', authenticateToken, async (req, res) => {
   try {
-    // Note: Sélectionne 'is_professional'
     const result = await pool.query('SELECT id, username, is_professional FROM users WHERE id = $1', [req.user.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Utilisateur non trouvé' });
@@ -220,9 +222,7 @@ app.delete('/events/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Non autorisé à supprimer cet événement' });
     }
 
-    // Supprimer d'abord les entrées dans user_events pour éviter les erreurs de clé étrangère
     await pool.query('DELETE FROM user_events WHERE event_id = $1', [id]);
-    // Puis supprimer l'événement
     const result = await pool.query('DELETE FROM events WHERE id = $1 RETURNING *', [id]);
 
     res.json({ message: 'Événement supprimé avec succès', event: result.rows[0] });
@@ -331,7 +331,6 @@ app.get('/events/:id/participants', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur: ' + err.message });
   }
 });
-
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

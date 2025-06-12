@@ -1,8 +1,7 @@
 version: '3.8'
-
 services:
   frontend:
-    build: ./frontend
+    image: sae_advanced_deployment-frontend:latest
     ports:
       - "3000:3000"
     depends_on:
@@ -11,29 +10,32 @@ services:
       - NODE_ENV=production
 
   backend:
-    build: ./backend
+    image: sae_advanced_deployment-backend:latest
     ports:
       - "3001:3001"
     depends_on:
       - db
+    secrets:
+      - db_user
+      - db_password
+      - jwt_secret
     environment:
-      - DB_USER=${DB_USER}
+      - DB_USER_FILE=/run/secrets/db_user
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
       - DB_HOST=db
-      - DB_NAME=${DB_NAME}
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=events_db
       - DB_PORT=5432
-      - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_key} 
-    env_file:
-      - .env
 
   db:
-    build:
-      context: ./db-init
-      dockerfile: Dockerfile
+    image: sae_advanced_deployment-db:latest
     environment:
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER_FILE=/run/secrets/db_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+      - POSTGRES_DB=events_db
+    secrets:
+      - db_user
+      - db_password
     volumes:
       - db-data:/var/lib/postgresql/data
     ports:
@@ -42,3 +44,11 @@ services:
 
 volumes:
   db-data:
+
+secrets:
+  db_user:
+    external: true
+  db_password:
+    external: true
+  jwt_secret:
+    external: true
