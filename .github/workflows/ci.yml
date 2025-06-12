@@ -1,19 +1,57 @@
-name: CI
+name: Deploy Docker Stack with Secrets
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4  
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Install Docker Compose
+        uses: docker/setup-buildx-action@v3  
+
+      - name: Build Docker images
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker-compose
-      - name: Build Docker Compose
-        run: docker-compose build
+          docker build -t sae_advanced_deployment-backend:latest ./backend
+          docker build -t sae_advanced_deployment-db:latest ./db-init
+          docker build -t sae_advanced_deployment-frontend:latest ./frontend
+
+      - name: Initialize Docker Swarm
+        run: docker swarm init
+
+      - name: Create Docker secrets
+        run: |
+          echo "${{ secrets.DB_USER }}" | docker secret create db_user -
+          echo "${{ secrets.DB_PASSWORD }}" | docker secret create db_password -
+          echo "${{ secrets.JWT_SECRET }}" | docker secret create jwt_secret -
+        env:
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      - name: Deploy Docker Stack
+        run: docker stack deploy -c docker-compose.yml mon_stack
+
+      - name: Verify deployment
+        run: docker stack ps mon_stack
+
+      - name: Check logs (optional)
+        run: |
+          docker service logs mon_stack_backend
+          docker service logs mon_stack_db
+          docker service logs mon_stack_frontend
+        continue-on-error: true  # Continue même si les logs échouent
+
+      - name: Clean up
+        if: always()  # Exécute même en cas d'échec
+        run: |
+          docker stack rm mon_stack || true
+          docker secret rm db_user db_password jwt_secret || true
+        continue-on-error: true  # Ignore les erreurs si les ressources sont déjà supprimées
