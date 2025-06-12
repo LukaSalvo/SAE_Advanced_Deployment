@@ -1,8 +1,10 @@
+
+
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(255) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  isProfessional BOOLEAN DEFAULT FALSE
+  password_hash VARCHAR(255) NOT NULL, 
+  is_professional BOOLEAN DEFAULT FALSE 
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -13,11 +15,12 @@ CREATE TABLE IF NOT EXISTS events (
   time TIME,
   location VARCHAR(255) NOT NULL,
   description TEXT,
-  category VARCHAR(100)
+  category VARCHAR(100),
+  participant_count INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS user_events (
   user_id INTEGER REFERENCES users(id),
-  event_id INTEGER REFERENCES events(id) ON DELETE CASCADE, 
+  event_id INTEGER REFERENCES events(id) ON DELETE CASCADE,
   PRIMARY KEY (user_id, event_id)
 );
