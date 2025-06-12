@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   frontend:
     build: ./frontend
@@ -8,6 +9,7 @@ services:
       - backend
     environment:
       - NODE_ENV=production
+
   backend:
     build: ./backend
     ports:
@@ -20,16 +22,20 @@ services:
       - DB_NAME=${DB_NAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PORT=5432
+
   db:
-    image: postgres:15
+    build:
+      context: ./db-init
+      dockerfile: Dockerfile
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
     volumes:
       - db-data:/var/lib/postgresql/data
-      - ./db-init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
+    restart: unless-stopped
+
 volumes:
   db-data:
